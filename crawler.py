@@ -11,6 +11,7 @@ reg = re.compile(r'</*br/*>')
 from bs4 import BeautifulSoup
 
 from collections import defaultdict
+from multiprocessing import Pool
 
 import config_http
 import aiohttp
@@ -32,6 +33,7 @@ class Crawler(object):
     self.tasks = Queue()
     self.max_tasks = 10
     self.headers = headers
+    self.novels = {}
     # 创建一个session对象，并keep-alive，即长连接
     self.session = aiohttp.ClientSession(loop = loop)
 
@@ -40,29 +42,18 @@ class Crawler(object):
     await self.tasks.put((None, '', url))
 
 
-  async def crawl(self, urls):
-    isfirst = True
-    padding = []
-    for url in urls:
-      self.novels = {}
-      start = time.time()
-      await self.setRootUrl(url)
-      # 创建十个子协程
-      if isfirst == True:
-        workers = [asyncio.Task(self.work()) for _ in range(self.max_tasks)]
-        isfirst == False
-      # 阻塞直至tasks为空
-      await self.tasks.join()
-      # 保存成txt
-      await self.save_txt()
-      end = time.time()
-      padding.append(end - start)
+  async def crawl(self, url):
+    await self.setRootUrl(url)
+    # 创建十个子协程
+    workers = [asyncio.Task(self.work()) for _ in range(self.max_tasks)]
+    # 阻塞直至tasks为空
+    await self.tasks.join()
+    # 保存成txt
+    await self.save_txt()
     # 取消所有workers后，触发error从而结束事件循环
     for w in workers:
       w.cancel()
     self.session.close()
-    for i in range(len(padding)):
-      print('第 #%d 部小说花费 (%s) 秒' % (i + 1, padding[i]))
 
 
   async def work(self):
@@ -141,17 +132,38 @@ class Crawler(object):
       with open(name, 'w') as f:
         for i in range(len(content)):
           f.write(content.get(i)['chapter'])
-          f.write('\n')
           f.write(content.get(i)['content'])
-          f.write('\n\n')
+          f.write('\n')
 
 
 
-if __name__ == '__main__':
+def process_start(url, headers):
   loop = asyncio.get_event_loop()
   # asyncio.Semaphore(),限制同时运行协程数量  
   # sem = asyncio.Semaphore(5)
-  config = config_http.config
-  crawler = Crawler(config['headers'], loop)
-  loop.run_until_complete(crawler.crawl(config['urls']))
+  crawler = Crawler(headers, loop)
+  loop.run_until_complete(crawler.crawl(url))
   loop.close()
+
+
+
+def start():
+  config = config_http.config
+  urls, headers = config['urls'], config['headers']
+  sum = 5 if 5 < len(urls) else len(urls)
+  print('创建%d个子进程...' % sum)
+  pool = Pool(sum)
+  start = time.time()
+  # 进程分配
+  for url in urls:
+    pool.apply_async(process_start, args = (url, headers))
+  print('等待所有进程结束')
+  pool.close()
+  pool.join()
+  end = time.time()
+  print('所有进程已结束')
+  spend = end - start
+  print('总用时：%s秒，平均用时：%s秒' % (spend, spend / len(urls)))
+
+if __name__ == '__main__':
+  start()
