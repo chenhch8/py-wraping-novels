@@ -33,7 +33,6 @@ class Crawler(object):
     self.tasks = Queue()
     self.max_tasks = 10
     self.headers = headers
-    self.novels = {}
     # 创建一个session对象，并keep-alive，即长连接
     self.session = aiohttp.ClientSession(loop = loop)
 
@@ -99,7 +98,7 @@ class Crawler(object):
     # 获取小说名
     name = html.dl.dt.string
     name = name[:name.find('》') + 1]
-    self.novels[url] = { 'name': name, 'content': defaultdict(lambda: None) }
+    self.novels = { 'name': name, 'content': defaultdict(lambda: None) }
     print('开始下载%s' % name)
     list = html.find_all('a')
     for index, value in enumerate(list):
@@ -109,7 +108,7 @@ class Crawler(object):
   async def __parseContent(self, html, url, id, book_url):
     chapter = html.find('div', attrs = { 'class': 'bookname' }).h1.string
     content = html.find('div', attrs = { 'id': 'content' })
-
+    
     content_str = ''
     for a in content.contents:
       if a.string is None:
@@ -117,23 +116,21 @@ class Crawler(object):
       else:
         content_str += re.sub(reg, '\n', a.string)
 
-    # print(content_str)
-
-    if self.novels[book_url]['content'][id] is None:
-      self.novels[book_url]['content'][id] = {}
-    self.novels[book_url]['content'][id]['chapter'] = chapter
-    self.novels[book_url]['content'][id]['content'] = content_str
+    if self.novels['content'][id] is None:
+      self.novels['content'][id] = {}
+    self.novels['content'][id]['chapter'] = chapter
+    self.novels['content'][id]['content'] = content_str
 
 
   async def save_txt(self):
-    for item in self.novels.values():
-      name = os.path.join('novels', item['name'] + '.txt')
-      content = item['content']
-      with open(name, 'w') as f:
-        for i in range(len(content)):
-          f.write(content.get(i)['chapter'])
-          f.write(content.get(i)['content'])
-          f.write('\n')
+    name = os.path.join('novels', self.novels['name'] + '.txt')
+    content = self.novels['content']
+    print('保存%s...' % self.novels['name'])
+    with open(name, 'w') as f:
+      for i in range(len(content)):
+        f.write(content.get(i)['chapter'])
+        f.write(content.get(i)['content'])
+    print('%s保存成功！' % self.novels['name'])
 
 
 
@@ -144,26 +141,40 @@ def process_start(url, headers):
   crawler = Crawler(headers, loop)
   loop.run_until_complete(crawler.crawl(url))
   loop.close()
-
+  print('close')
 
 
 def start():
   config = config_http.config
   urls, headers = config['urls'], config['headers']
-  sum = 5 if 5 < len(urls) else len(urls)
-  print('创建%d个子进程...' % sum)
-  pool = Pool(sum)
-  start = time.time()
-  # 进程分配
-  for url in urls:
-    pool.apply_async(process_start, args = (url, headers))
-  print('等待所有进程结束')
-  pool.close()
-  pool.join()
-  end = time.time()
-  print('所有进程已结束')
-  spend = end - start
-  print('总用时：%s秒，平均用时：%s秒' % (spend, spend / len(urls)))
+
+  first = 0; rear = 4 if len(urls) > 4 else None
+  time_count = 0
+  while True:
+    count = rear - first if rear is not None else len(urls) - first
+    print('创建%d个子进程...' % count)
+    pool = Pool(count)
+    start = time.time()
+    # 进程分配
+    for url in urls[first:rear]:
+      pool.apply_async(
+        process_start,
+        args = (url, headers),
+        error_callback = lambda err: print(err)
+      )
+    print('等待所有进程结束')
+    pool.close()
+    pool.join()
+    end = time.time()
+    time_count += end - start
+    print('所有进程已结束')
+    if rear == None or rear >= len(urls):
+      break
+    first = rear
+    rear = first + 4
+    rear = rear if rear < len(urls) else None
+
+  print('共 %s 本小说，总用时：%s秒，平均用时：%s秒' % (len(urls), time_count, time_count / len(urls)))
 
 if __name__ == '__main__':
   start()

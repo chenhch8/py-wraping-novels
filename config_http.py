@@ -12,6 +12,11 @@ config = {
     'http://www.biqiuge.com/book/4772/',
     'http://www.biqiuge.com/book/179/',
     'http://www.biqiuge.com/book/630/',
-    'http://www.biqiuge.com/book/158/'
+    'http://www.biqiuge.com/book/158/',
+    'http://www.biqiuge.com/book/420/',
+    'http://www.biqiuge.com/book/711/',
+    'http://www.biqiuge.com/book/5190/',
+    'http://www.biqiuge.com/book/2001/',
+    'http://www.biqiuge.com/book/1267/'
   ]
 }
