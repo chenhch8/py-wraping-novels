@@ -16,6 +16,7 @@ import config_http
 import aiohttp
 import asyncio
 import os
+import time
 
 # asynio队列，用于存储任务
 try:
@@ -31,28 +32,37 @@ class Crawler(object):
     self.tasks = Queue()
     self.max_tasks = 10
     self.headers = headers
-    self.novels = {}
     # 创建一个session对象，并keep-alive，即长连接
     self.session = aiohttp.ClientSession(loop = loop)
 
 
-  async def setRootUrls(self, urls):
-    for url in urls:
-      await self.tasks.put((None, '', url))
+  async def setRootUrl(self, url):
+    await self.tasks.put((None, '', url))
 
 
   async def crawl(self, urls):
-    await self.setRootUrls(urls)
-    # 创建十个子协程
-    workers = [asyncio.Task(self.work()) for _ in range(self.max_tasks)]
-    # 阻塞直至tasks为空
-    await self.tasks.join()
-    # 保存成txt
-    await self.save_txt()
+    isfirst = True
+    padding = []
+    for url in urls:
+      self.novels = {}
+      start = time.time()
+      await self.setRootUrl(url)
+      # 创建十个子协程
+      if isfirst == True:
+        workers = [asyncio.Task(self.work()) for _ in range(self.max_tasks)]
+        isfirst == False
+      # 阻塞直至tasks为空
+      await self.tasks.join()
+      # 保存成txt
+      await self.save_txt()
+      end = time.time()
+      padding.append(end - start)
     # 取消所有workers后，触发error从而结束事件循环
     for w in workers:
       w.cancel()
     self.session.close()
+    for i in range(len(padding)):
+      print('第 #%d 部小说花费 (%s) 秒' % (i + 1, padding[i]))
 
 
   async def work(self):
@@ -61,6 +71,9 @@ class Crawler(object):
       id, url, book_url = await self.tasks.get()
       # [1] 抓取 html
       html, url = await self.fetch(book_url + url)
+      if html is None:
+        self.tasks.task_done()
+        continue
       # [2] 解析 html
       await self.parseHtml(html, url, id, book_url)
       # 告诉队列所获取的url已处理完毕
@@ -70,10 +83,14 @@ class Crawler(object):
   async def fetch(self, url):
     print('抓取<%s>' % url)
     res = await self.session.get(url, headers = self.headers)
-    assert res.status == 200
-    html = await res.text(encoding='gbk')
-    print('<%s>抓取成功！' % url)
-    return html, url
+    if res.status == 200:
+      html = await res.text(encoding='gbk')
+      print('<%s>抓取成功！' % url)
+      return html, url
+    else:
+      assert res.status == 200
+      print('<%s>抓取失败！' % url)
+      return None, url
 
 
   async def parseHtml(self, html, url, id, book_url):
