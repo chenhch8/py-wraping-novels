@@ -9,6 +9,7 @@ config = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36'
   },
   'urls': [
+    # 在此处添加想要爬取的小说url，如以下
     'http://www.biqiuge.com/book/4772/',
     'http://www.biqiuge.com/book/179/',
     'http://www.biqiuge.com/book/630/',
