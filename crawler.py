@@ -112,9 +112,9 @@ class Crawler(object):
     content_str = ''
     for a in content.contents:
       if a.string is None:
-        content_str += re.sub(reg, '\n', str(a))
+        content_str += re.sub(reg, '', str(a))
       else:
-        content_str += re.sub(reg, '\n', a.string)
+        content_str += re.sub(reg, '', a.string)
 
     if self.novels['content'][id] is None:
       self.novels['content'][id] = {}
@@ -130,6 +130,8 @@ class Crawler(object):
       for i in range(len(content)):
         f.write(content.get(i)['chapter'])
         f.write(content.get(i)['content'])
+        f.write('\n')
+        f.write('\n')
     print('%s保存成功！' % self.novels['name'])
 
 
