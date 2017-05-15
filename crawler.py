@@ -71,22 +71,22 @@ class Crawler(object):
 
 
   async def fetch(self, url):
-    print('抓取<%s>' % url)
+    # print('抓取<%s>' % url)
     res = await self.session.get(url, headers = self.headers)
     if res.status == 200:
       html = await res.text(encoding='gbk')
-      print('<%s>抓取成功！' % url)
+      print('√ <%s>' % url)
       return html, url
     else:
       assert res.status == 200
-      print('<%s>抓取失败！' % url)
+      print('× <%s>' % url)
       return None, url
 
 
   async def parseHtml(self, html, url, id, book_url):
-    print('解析<%s>网页' % url)
+    # print('解析<%s>网页' % url)
     html = BeautifulSoup(html, 'html.parser')
-    print('<%s>解析成功' % url)
+    # print('<%s>解析成功' % url)
     if id is None: # 解析小说章节列表页
       await self.__parseHome(html, url)
     else: # 解析小说内容页
@@ -99,7 +99,7 @@ class Crawler(object):
     name = html.dl.dt.string
     name = name[:name.find('》') + 1]
     self.novels = { 'name': name, 'content': defaultdict(lambda: None) }
-    print('开始下载%s' % name)
+    # print('开始下载%s' % name)
     list = html.find_all('a')
     for index, value in enumerate(list):
       self.tasks.put_nowait((index, value['href'], url))
@@ -125,14 +125,14 @@ class Crawler(object):
   async def save_txt(self):
     name = os.path.join('novels', self.novels['name'] + '.txt')
     content = self.novels['content']
-    print('保存%s...' % self.novels['name'])
+    # print('保存%s...' % self.novels['name'])
     with open(name, 'w') as f:
       for i in range(len(content)):
         f.write(content.get(i)['chapter'])
         f.write(content.get(i)['content'])
         f.write('\n')
         f.write('\n')
-    print('%s保存成功！' % self.novels['name'])
+    print('√ %s' % self.novels['name'])
 
 
 
@@ -143,7 +143,7 @@ def process_start(url, headers):
   crawler = Crawler(headers, loop)
   loop.run_until_complete(crawler.crawl(url))
   loop.close()
-  print('close')
+  # print('close')
 
 
 def start():
